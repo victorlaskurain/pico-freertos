@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -euo pipefail
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+cd "$script_dir/.."
+
+git submodule update --init --recursive
+rm -rf build
+mkdir -p build
+cd build
+cmake -DPICO_SDK_PATH=../submodules/pico-sdk -DFREERTOS_KERNEL_PATH=../submodules/freertos-kernel ..
