@@ -7,7 +7,7 @@ include(submodules/freertos-kernel/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kerne
 project(pico_freertos C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-include_directories(include)
+include_directories(freertospp/include)
 
 # Initialize the SDK
 pico_sdk_init()
@@ -20,3 +20,4 @@ add_compile_options(-Wall
 
 add_subdirectory(blinky_vanilla)
 add_subdirectory(blinky_cpp)
+add_subdirectory(queue_basic_cpp)
