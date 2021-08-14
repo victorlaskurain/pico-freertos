@@ -7,6 +7,7 @@ include(submodules/freertos-kernel/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kerne
 project(pico_freertos C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+include_directories(include)
 
 # Initialize the SDK
 pico_sdk_init()
@@ -17,11 +18,5 @@ add_compile_options(-Wall
         -Wno-maybe-uninitialized
 )
 
-add_executable(pico_freertos src/main.cpp)
-# enable usb output, disable uart output
-pico_enable_stdio_usb(pico_freertos 1)
-pico_enable_stdio_uart(pico_freertos 0)
-target_include_directories(pico_freertos PUBLIC include submodules/freertos-kernel/include submodules/freertos-kernel/portable/ThirdParty/GCC/RP2040/include)
-target_link_libraries(pico_freertos pico_stdlib)
-target_link_libraries(pico_freertos FreeRTOS-Kernel FreeRTOS-Kernel-Core FreeRTOS-Kernel-Heap4)
-pico_add_extra_outputs(pico_freertos)
+add_subdirectory(blinky_vanilla)
+add_subdirectory(blinky_cpp)
