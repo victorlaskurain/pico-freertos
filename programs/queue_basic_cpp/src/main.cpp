@@ -7,85 +7,22 @@
 
 #include <vla/queue.hpp>
 #include <vla/task.hpp>
+#include <vla/serial_io.hpp>
 #include <variant>
 
-struct Buffer {
-    using Deleter = void (*)(uint8_t *);
-    uint8_t *data;
-    uint32_t size;
-    Deleter deleter;
-    static Buffer createOwned(uint8_t *data, uint32_t size, Deleter deleter) {
-        return {.data = data, .size = size, .deleter = deleter};
-    }
-    static Buffer create(uint8_t *data, uint32_t size) {
-        return {.data = data, .size = size, .deleter = nullptr};
-    }
-    static Buffer createFromString(const char *str) {
-        return {
-            .data = (uint8_t *)str, .size = strlen(str), .deleter = nullptr};
-    }
-};
+using vla::serial_io::Buffer;
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
 using BoxedCharPtr = vla::Box<ManagedCharPtr>;
 BoxedCharPtr make_boxed_char_ptr(const char* s) {
     return BoxedCharPtr(ManagedCharPtr(strdup(s), &free));
 }
-/**
- * OutputMsg is a message to the outputManager. It can be a Buffer, an
- * owed charptr in the form of a Boxed unique_ptr or a simple non
- * owning char pointer
- */
-struct OutputMsg : public vla::WithReply<int32_t> {
-    std::variant<Buffer, BoxedCharPtr, const char*> buffer;
-    OutputMsg() = default;
-    template <typename B, typename ReplyQueue>
-    OutputMsg(B &&b, ReplyQueue &q) : WithReply(q), buffer(b) {}
-    template<typename B>
-    OutputMsg(B &&b) : buffer(b){}
-};
-struct InputMsg : public vla::WithReply<Buffer> {
-    Buffer buffer;
-    InputMsg() = default;
-    template <typename ReplyQueue>
-    InputMsg(const Buffer &b, ReplyQueue &q) : WithReply(q), buffer(b) {}
-};
-using InputQueue = vla::Queue<InputMsg>;
-using OutputQueue = vla::Queue<OutputMsg>;
+using InputMsg = vla::serial_io::InputMsg;
+using OutputMsg = vla::serial_io::OutputMsg;
+using InputQueue = vla::serial_io::InputQueue;
+using OutputQueue = vla::serial_io::OutputQueue;
 
-void inputManager(InputQueue::Receiver q) {
-    stdio_init_all();
-    while (true) {
-        auto msg = q.receive();
-        if (msg.buffer.size) {
-            msg.buffer.size = read(0, msg.buffer.data, msg.buffer.size);
-            msg.reply(msg.buffer);
-        }
-    }
-}
-
-void outputManager(OutputQueue::Receiver q) {
-    stdio_init_all();
-    while (true) {
-        auto msg = q.receive();
-        if (auto buffer = std::get_if<Buffer>(&msg.buffer)) {
-            if (buffer->size) {
-                msg.reply(write(1, buffer->data, buffer->size));
-                if (buffer->deleter) {
-                    buffer->deleter(buffer->data);
-                }
-            }
-            continue;
-        }
-        if (auto box = std::get_if<BoxedCharPtr>(&msg.buffer)) {
-            auto chars = box->unbox();
-            msg.reply(write(1, chars.get(), strlen(chars.get())));
-            continue;
-        }
-        if (auto s = std::get_if<const char*>(&msg.buffer)) {
-            msg.reply(write(1, *s, strlen(*s)));
-        }
-    }
-}
+auto inputManager = vla::serial_io::stdin_manager;
+auto outputManager = vla::serial_io::stdout_manager;
 
 using BlinkQueue = vla::Queue<bool>;
 void blink(BlinkQueue::Receiver q) {
@@ -123,6 +60,13 @@ void echo(InputQueue::Sender iq, OutputQueue::Sender oq) {
     }
 }
 
+Buffer buffer_from_string(const char *str) {
+    return {
+        .data = (uint8_t *)str, .size = strlen(str), .deleter = nullptr
+    };
+}
+
+
 void run(BlinkQueue::Sender &bq, OutputQueue::Sender &oq) {
     bool isLedOn = false;
     while (true) {
@@ -130,7 +74,7 @@ void run(BlinkQueue::Sender &bq, OutputQueue::Sender &oq) {
         isLedOn = !isLedOn;
         bq.send(isLedOn);
         // three calls just to show different message body types.
-        oq.send(Buffer::createFromString("Toggle"));
+        oq.send(buffer_from_string("Toggle"));
         oq.send(make_boxed_char_ptr(" "));
         oq.send("led!\n");
     }

@@ -1,6 +1,7 @@
 #ifndef VLA_QUEUE_HPP
 #define VLA_QUEUE_HPP
 
+#include <FreeRTOS.h>
 #include <memory>
 #include <queue.h>
 #include <type_traits>

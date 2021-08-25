@@ -19,7 +19,4 @@ add_compile_options(-Wall
 )
 
 add_subdirectory(freertospp)
-add_subdirectory(blinky_vanilla)
-add_subdirectory(blinky_cpp)
-add_subdirectory(queue_basic_cpp)
-add_subdirectory(analog)
+add_subdirectory(programs)
