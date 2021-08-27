@@ -38,6 +38,15 @@ template <typename ItemType> class QueueReceiver {
     ItemType receive(TickType_t wait = portMAX_DELAY) {
         return impl->receive(wait);
     }
+
+    bool peek(ItemType &v, TickType_t wait = portMAX_DELAY) {
+        return impl->peek(v, wait);
+    }
+
+    ItemType peek(TickType_t wait = portMAX_DELAY) {
+        return impl->peek(wait);
+    }
+
 };
 
 template <typename ItemType> class Queue {
@@ -66,7 +75,7 @@ template <typename ItemType> class Queue {
     }
 
     bool sendFromIsr(const ItemType &v, BaseType_t *taskWoken = nullptr) {
-        return pdTRUE == xQueueSendToBackFromIsr(queue.get(), &v, taskWoken);
+        return pdTRUE == xQueueSendToBackFromISR(queue.get(), &v, taskWoken);
     }
 
     bool sendFrontFromIsr(const ItemType &v, BaseType_t *taskWoken = nullptr) {
@@ -84,6 +93,20 @@ template <typename ItemType> class Queue {
     ItemType receive(TickType_t wait = portMAX_DELAY) {
         ItemType v;
         xQueueReceive(queue.get(), &v, wait);
+        return v;
+    }
+
+    bool peek(ItemType &v, TickType_t wait = portMAX_DELAY) {
+        return pdTRUE == xQueuePeek(queue.get(), &v, wait);
+    }
+
+    bool peekFromIsr(ItemType &v, TickType_t wait = portMAX_DELAY) {
+        return pdTRUE == xQueuePeekFromISR(queue.get(), &v, wait);
+    }
+
+    ItemType peek(TickType_t wait = portMAX_DELAY) {
+        ItemType v;
+        xQueuePeek(queue.get(), &v, wait);
         return v;
     }
 
