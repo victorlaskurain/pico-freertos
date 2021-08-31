@@ -21,13 +21,16 @@ def main():
         parity=serial.PARITY_NONE
     )
     while True:
-        time.sleep(2)
+        time.sleep(1)
         ser.write(msg)
         line = ser.read(400)
         print(line)
-        print(format(line))
-        print(line.decode('utf-8', 'ignore'))
+        for l in line.split(b'\r\n'):
+            print(l)
+        # print(format(line))
+        # print(line.decode('utf-8', 'ignore'))
         print
+        break
 
 if __name__ == '__main__':
     main()

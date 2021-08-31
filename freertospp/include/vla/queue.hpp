@@ -25,6 +25,21 @@ template <typename ItemType> class QueueSender {
     }
 };
 
+template <typename ItemType> class QueueSenderIsr {
+    Queue<ItemType> *impl;
+
+  public:
+    QueueSenderIsr(Queue<ItemType> *q) : impl(q) {}
+
+    bool send(const ItemType &v, BaseType_t *taskWoken = nullptr) {
+        return impl->sendFromIsr(v, taskWoken);
+    }
+
+    bool sendFront(const ItemType &v, BaseType_t *taskWoken = nullptr) {
+        return impl->sendFrontFromIsr(v, taskWoken);
+    }
+};
+
 template <typename ItemType> class QueueReceiver {
     Queue<ItemType> *impl;
 
@@ -65,6 +80,9 @@ template <typename ItemType> class Queue {
 
     using Receiver = QueueReceiver<ItemType>;
     Receiver receiver() { return Receiver(this); }
+
+    using SenderIsr = QueueSenderIsr<ItemType>;
+    SenderIsr sender_isr() { return SenderIsr(this); }
 
     bool send(const ItemType &v, TickType_t wait = portMAX_DELAY) {
         return pdTRUE == xQueueSendToBack(queue.get(), &v, wait);

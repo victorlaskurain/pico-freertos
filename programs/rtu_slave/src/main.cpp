@@ -147,7 +147,7 @@ int main() {
     auto inputTask =
         vla::Task(std::bind(input_manager, iq.receiver()), "Input Task", 256);
 
-    auto modbus_task = vla::Task(std::bind(vla::modbus_daemon, iq.sender(),
+    auto modbus_task = vla::Task(std::bind(vla::modbus_daemon_stdin,
                                            oq.sender(), handle_modbus_message),
                                  "Modbus Task", 1024);
 
