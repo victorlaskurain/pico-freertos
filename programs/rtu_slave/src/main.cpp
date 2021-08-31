@@ -3,7 +3,6 @@
 #include <pico/stdlib.h>
 #include <string.h>
 #include <task.h>
-#include <unistd.h>
 #include <variant>
 
 #include <vla/adc.hpp>
@@ -13,37 +12,13 @@
 #include <vla/serial_io.hpp>
 #include <vla/task.hpp>
 
-using vla::serial_io::BoxedCharPtr;
-using vla::serial_io::InputQueue;
-using vla::serial_io::make_boxed_char_ptr;
-using vla::serial_io::ManagedCharPtr;
-using vla::serial_io::OutputMsg;
 using vla::serial_io::OutputQueue;
 auto output_manager = vla::serial_io::stdout_manager;
-auto input_manager  = vla::serial_io::stdin_manager;
 
-// using vla::serial_io::print;
-#define print(...)
-
-static void run(OutputQueue::Sender q) {
-    for (auto i = 5; i > 0; --i) {
-        print(q, "Sleep ", i, "\n");
-        sleep_ms(1000);
-    }
-    print(q, "Begin\n");
+static void adc_init() {
     auto mask = vla::adc::AdcInput::ADC_0 | vla::adc::AdcInput::ADC_1 |
                 vla::adc::AdcInput::ADC_4;
     vla::adc::init(mask, 100);
-    while (true) {
-        for (auto adci : {vla::adc::AdcInput::ADC_0, vla::adc::AdcInput::ADC_1,
-                          vla::adc::AdcInput::ADC_2, vla::adc::AdcInput::ADC_3,
-                          vla::adc::AdcInput::ADC_4}) {
-            print(q, "Selected: ", adci,
-                  " value: ", vla::adc::read(adci).value_or(-1), "\n");
-        }
-        print(q, "\n");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
 }
 
 static void led_init() {
@@ -52,9 +27,7 @@ static void led_init() {
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
 }
 
-struct Token {
-    int32_t ignore;
-};
+struct Token {};
 using TokenQueue  = vla::Queue<Token>;
 using SwitchQueue = vla::Queue<bool>;
 static void led_manager(SwitchQueue::Receiver q) {
@@ -80,16 +53,6 @@ static void switch_led(SwitchLedConfig c) {
     }
 }
 
-static void write_msg(OutputQueue::Sender q, const char *msg,
-                      uint16_t initial_delay) {
-    auto i = 0;
-    sleep_ms(initial_delay);
-    while (true) {
-        print(q, ++i, " ", msg, "\n");
-        sleep_ms(1000);
-    }
-}
-
 class RtuHandler : public vla::PduHandlerBase<RtuHandler> {
   public:
     bool is_read_registers_supported() {
@@ -99,7 +62,13 @@ class RtuHandler : public vla::PduHandlerBase<RtuHandler> {
         return true;
     }
     bool execute_read_single_register(uint16_t address, uint16_t *w) {
-        *w = address;
+        if (address <= uint16_t(vla::adc::AdcInput::ADC_4)) {
+            auto adci = vla::adc::AdcInput(address);
+            *w        = vla::adc::read(adci).value_or(-1);
+        } else {
+            *w = uint16_t(-1);
+        }
+
         return true;
     }
     RtuHandler(vla::RtuAddress addr) : vla::PduHandlerBase<RtuHandler>(addr) {
@@ -113,8 +82,12 @@ void handle_modbus_message(const vla::RtuMessage &indication,
 }
 
 int main() {
+    // initialize libraries
     stdio_init_all();
     led_init();
+    adc_init();
+    // create a three task to keep the led blinking and show how can
+    // several tasks talk to each other.
     auto sq  = SwitchQueue(1);
     auto tq1 = TokenQueue(1);
     auto tq2 = TokenQueue(1);
@@ -136,27 +109,13 @@ int main() {
                                               .delay_ms  = 1000}),
         "Led off");
 
+    // create the stdout multiplexing task
     auto oq = OutputQueue(100);
-    auto iq = InputQueue(8);
-
-    auto mainTask = vla::Task(std::bind(run, oq.sender()), "Main Task", 512);
-    configASSERT(mainTask);
-
-    auto pingTask = vla::Task(std::bind(write_msg, oq.sender(), "Ping!", 0),
-                              "Ping Task", 256);
-    configASSERT(pingTask);
-
-    auto pongTask = vla::Task(std::bind(write_msg, oq.sender(), "Pong!", 250),
-                              "Pong Task", 256);
-    configASSERT(pongTask);
-
     auto outputTask =
         vla::Task(std::bind(output_manager, oq.receiver()), "Output Task", 256);
     configASSERT(outputTask);
 
-    auto inputTask =
-        vla::Task(std::bind(input_manager, iq.receiver()), "Input Task", 256);
-
+    // publish the most recent ADC value via modbus.
     auto modbus_task = vla::Task(
         std::bind(vla::modbus_daemon_stdin, oq.sender(), handle_modbus_message),
         "Modbus Task", 1024);
