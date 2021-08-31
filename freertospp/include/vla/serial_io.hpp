@@ -26,7 +26,7 @@ struct Buffer {
 };
 
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
-using BoxedCharPtr = vla::Box<ManagedCharPtr>;
+using BoxedCharPtr   = vla::Box<ManagedCharPtr>;
 BoxedCharPtr make_boxed_char_ptr(const char *s);
 /**
  * OutputMsg is a message to the outputManager. It can be an owned
@@ -37,8 +37,10 @@ struct OutputMsg : public vla::WithReply<int32_t> {
     std::variant<BoxedCharPtr, Buffer, const char *> buffer;
     OutputMsg() = default;
     template <typename B, typename ReplyQueue>
-    OutputMsg(B &&b, ReplyQueue &q) : WithReply(q), buffer(b) {}
-    template <typename B> OutputMsg(B &&b) : buffer(b) {}
+    OutputMsg(B &&b, ReplyQueue &q) : WithReply(q), buffer(b) {
+    }
+    template <typename B> OutputMsg(B &&b) : buffer(b) {
+    }
 };
 using OutputQueue = vla::Queue<OutputMsg>;
 
@@ -66,7 +68,8 @@ struct InputMsg : public vla::WithReply<Buffer> {
     Buffer buffer;
     InputMsg() = default;
     template <typename ReplyQueue>
-    InputMsg(const Buffer &b, ReplyQueue &q) : WithReply(q), buffer(b) {}
+    InputMsg(const Buffer &b, ReplyQueue &q) : WithReply(q), buffer(b) {
+    }
 };
 using InputQueue = vla::Queue<InputMsg>;
 

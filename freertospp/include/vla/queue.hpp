@@ -14,7 +14,8 @@ template <typename ItemType> class QueueSender {
     Queue<ItemType> *impl;
 
   public:
-    QueueSender(Queue<ItemType> *q) : impl(q) {}
+    QueueSender(Queue<ItemType> *q) : impl(q) {
+    }
 
     bool send(const ItemType &v, TickType_t wait = portMAX_DELAY) {
         return impl->send(v, wait);
@@ -29,7 +30,8 @@ template <typename ItemType> class QueueSenderIsr {
     Queue<ItemType> *impl;
 
   public:
-    QueueSenderIsr(Queue<ItemType> *q) : impl(q) {}
+    QueueSenderIsr(Queue<ItemType> *q) : impl(q) {
+    }
 
     bool send(const ItemType &v, BaseType_t *taskWoken = nullptr) {
         return impl->sendFromIsr(v, taskWoken);
@@ -44,7 +46,8 @@ template <typename ItemType> class QueueReceiver {
     Queue<ItemType> *impl;
 
   public:
-    QueueReceiver(Queue<ItemType> *q) : impl(q) {}
+    QueueReceiver(Queue<ItemType> *q) : impl(q) {
+    }
 
     bool receive(ItemType &v, TickType_t wait = portMAX_DELAY) {
         return impl->receive(v, wait);
@@ -61,28 +64,36 @@ template <typename ItemType> class QueueReceiver {
     ItemType peek(TickType_t wait = portMAX_DELAY) {
         return impl->peek(wait);
     }
-
 };
 
 template <typename ItemType> class Queue {
     static_assert(std::is_trivially_copyable<ItemType>::value);
     struct QueueHandleDeleter {
         using pointer = QueueHandle_t;
-        void operator()(QueueHandle_t q) { vQueueDelete(q); }
+        void operator()(QueueHandle_t q) {
+            vQueueDelete(q);
+        }
     };
     std::unique_ptr<QueueHandle_t, QueueHandleDeleter> queue;
 
   public:
-    Queue(UBaseType_t length) : queue(xQueueCreate(length, sizeof(ItemType))) {}
+    Queue(UBaseType_t length) : queue(xQueueCreate(length, sizeof(ItemType))) {
+    }
 
     using Sender = QueueSender<ItemType>;
-    Sender sender() { return Sender(this); }
+    Sender sender() {
+        return Sender(this);
+    }
 
     using Receiver = QueueReceiver<ItemType>;
-    Receiver receiver() { return Receiver(this); }
+    Receiver receiver() {
+        return Receiver(this);
+    }
 
     using SenderIsr = QueueSenderIsr<ItemType>;
-    SenderIsr sender_isr() { return SenderIsr(this); }
+    SenderIsr sender_isr() {
+        return SenderIsr(this);
+    }
 
     bool send(const ItemType &v, TickType_t wait = portMAX_DELAY) {
         return pdTRUE == xQueueSendToBack(queue.get(), &v, wait);
@@ -128,7 +139,9 @@ template <typename ItemType> class Queue {
         return v;
     }
 
-    operator bool() const { return queue; }
+    operator bool() const {
+        return queue;
+    }
 };
 
 /**
@@ -152,7 +165,9 @@ template <typename UniquePtr> class Box {
         ptr.release();
     }
     Box() = default;
-    UniquePtr unbox() { return UniquePtr(data, deleter); }
+    UniquePtr unbox() {
+        return UniquePtr(data, deleter);
+    }
 };
 
 /**
@@ -178,13 +193,13 @@ template <typename MsgReply> class WithReply {
     typedef bool (*reply_callback_t)(void *queue, const MsgReply &reply,
                                      TickType_t);
     reply_callback_t cb = nullptr;
-    void *queue = nullptr;
+    void *queue         = nullptr;
 
   public:
     WithReply() = default;
     template <typename ReplyQueue> WithReply(ReplyQueue &q) {
         queue = &q;
-        cb = [](void *q, const MsgReply &reply, TickType_t wait) {
+        cb    = [](void *q, const MsgReply &reply, TickType_t wait) {
             ReplyQueue *queue = static_cast<ReplyQueue *>(q);
             return queue->sender().send(reply, wait);
         };

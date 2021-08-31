@@ -1,17 +1,17 @@
+#include <pico/stdlib.h>
+#include <unistd.h>
 #include <variant>
 #include <vla/hw_timer.hpp>
 #include <vla/modbus_daemon.hpp>
-#include <pico/stdlib.h>
-#include <unistd.h>
 
 namespace vla {
 
 #ifdef MODBUS_RTU_STD_TIMEOUTS
 static const auto inter_frame_delay = period_us{1750};
-static const auto inter_char_delay  = period_us{ 750};
+static const auto inter_char_delay  = period_us{750};
 #else
-static const auto inter_frame_delay = period_us{  75};
-static const auto inter_char_delay  = period_us{  15};
+static const auto inter_frame_delay = period_us{75};
+static const auto inter_char_delay  = period_us{15};
 #endif
 
 enum class state_t : uint8_t {
@@ -37,9 +37,9 @@ const char *state_name(state_t s) {
     return "XXX";
 };
 
-using InputMsg = vla::serial_io::InputMsg;
+using InputMsg  = vla::serial_io::InputMsg;
 using OutputMsg = vla::serial_io::OutputMsg;
-using Buffer = vla::serial_io::Buffer;
+using Buffer    = vla::serial_io::Buffer;
 
 static bool must_transmit(const rtu_message &msg) {
     return msg.length > 0;
@@ -61,15 +61,15 @@ void get_chars_stdin_timer(ModbusDaemonQueue::SenderIsr *q) {
         return;
     }
     auto handler = [](alarm_id, void *d) -> int64_t {
-                       BaseType_t taskWoken;
-                       auto q = static_cast<ModbusDaemonQueue::SenderIsr*>(d);
-                       auto chr = getchar_timeout_us(0);
-                       while (chr >= 0) {
-                           q->send(ReadChar(time_us_64(), chr), &taskWoken);
-                           chr = getchar_timeout_us(0);
-                       }
-                       return -500;
-                   };
+        BaseType_t taskWoken;
+        auto q   = static_cast<ModbusDaemonQueue::SenderIsr *>(d);
+        auto chr = getchar_timeout_us(0);
+        while (chr >= 0) {
+            q->send(ReadChar(time_us_64(), chr), &taskWoken);
+            chr = getchar_timeout_us(0);
+        }
+        return -500;
+    };
     vla::set_alarm(period_us(500), handler, q);
 }
 
@@ -102,7 +102,7 @@ void modbus_daemon(ModbusDaemonQueue &q,
         //     last_state = state;
         // }
         if (state_t::INITIAL == state) {
-            aid = set_alarm(q, inter_frame_delay);
+            aid      = set_alarm(q, inter_frame_delay);
             auto msg = q.receive();
             // ignore chars in this state
             if (std::get_if<ReadChar>(&msg)) {
@@ -115,14 +115,14 @@ void modbus_daemon(ModbusDaemonQueue &q,
         if (state_t::READY == state) {
             auto msg = q.receive();
             if (auto input_msg = std::get_if<ReadChar>(&msg)) {
-                chr = input_msg->chr;
-                aid = set_alarm(q, inter_frame_delay);
+                chr                = input_msg->chr;
+                aid                = set_alarm(q, inter_frame_delay);
                 buffer[buffer_i++] = chr;
-                state = state_t::RECEPTION;
+                state              = state_t::RECEPTION;
             } else if (auto rtu_msg_ptr = std::get_if<vla::rtu_message>(&msg)) {
                 if (must_transmit(*rtu_msg_ptr)) {
                     rtu_msg = *rtu_msg_ptr;
-                    state = state_t::EMISSION;
+                    state   = state_t::EMISSION;
                 }
             } else {
                 state = state_t::INITIAL;
@@ -142,11 +142,11 @@ void modbus_daemon(ModbusDaemonQueue &q,
                     q.receive();
                 }
                 buffer[buffer_i++] = chr;
-                aid = set_alarm(q, inter_frame_delay);
+                aid                = set_alarm(q, inter_frame_delay);
             } else if (std::get_if<TimeoutMsg>(&msg)) {
-                rtu_msg = rtu_message(buffer, buffer_i);
+                rtu_msg  = rtu_message(buffer, buffer_i);
                 buffer_i = 0;
-                state = state_t::PROCESSING;
+                state    = state_t::PROCESSING;
             } else {
                 state = state_t::INITIAL;
             }
@@ -168,7 +168,8 @@ void modbus_daemon(ModbusDaemonQueue &q,
             continue;
         }
         if (state_t::EMISSION == state) {
-            outq.send(OutputMsg(Buffer::create(rtu_msg.buffer, rtu_msg.length), q));
+            outq.send(
+                OutputMsg(Buffer::create(rtu_msg.buffer, rtu_msg.length), q));
             q.receive();
             state = state_t::INITIAL;
             continue;

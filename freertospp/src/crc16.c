@@ -33,7 +33,7 @@ uint16_t vla_modbus_crc16(const uint8_t *buf, uint16_t len) {
         0x4540, 0x8701, 0x47C0, 0x4680, 0x8641, 0x8201, 0x42C0, 0x4380, 0x8341,
         0x4100, 0x81C1, 0x8081, 0x4040};
 
-    uint8_t xor = 0;
+    uint8_t xor  = 0;
     uint16_t crc = 0xFFFF;
 
     while (len--) {

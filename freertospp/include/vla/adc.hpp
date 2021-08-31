@@ -17,7 +17,8 @@ constexpr uint8_t CHANNEL_COUNT = 5;
 struct AdcMask {
     uint8_t mask;
     AdcMask() = default;
-    constexpr AdcMask(AdcInput ai) : mask(1 << uint8_t(ai)) {}
+    constexpr AdcMask(AdcInput ai) : mask(1 << uint8_t(ai)) {
+    }
     constexpr AdcMask &operator|=(AdcMask right) {
         mask |= right.mask;
         return *this;
@@ -26,7 +27,9 @@ struct AdcMask {
         mask &= right.mask;
         return *this;
     }
-    operator bool() const { return mask; }
+    operator bool() const {
+        return mask;
+    }
 };
 
 std::ostream &operator<<(std::ostream &ost, AdcMask m);
@@ -36,7 +39,9 @@ constexpr AdcMask operator~(AdcMask left) {
     return left;
 }
 
-constexpr AdcMask operator~(AdcInput left) { return ~AdcMask(left); }
+constexpr AdcMask operator~(AdcInput left) {
+    return ~AdcMask(left);
+}
 
 constexpr AdcMask operator|(AdcMask left, AdcInput right) {
     return left |= right;

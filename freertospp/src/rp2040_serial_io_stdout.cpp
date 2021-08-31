@@ -1,7 +1,7 @@
-#include <vla/serial_io.hpp>
 #include <cstring>
 #include <pico/stdlib.h>
 #include <unistd.h>
+#include <vla/serial_io.hpp>
 
 namespace vla {
 namespace serial_io {

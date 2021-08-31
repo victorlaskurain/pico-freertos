@@ -38,7 +38,7 @@ int main() {
     configASSERT(pdPASS == taskErr);
 
     auto data = HelloCountData{"Hello, world multitasking!", 0};
-    taskErr = xTaskCreate((TaskFunction_t)(helloCount), "Hello task", 512,
+    taskErr   = xTaskCreate((TaskFunction_t)(helloCount), "Hello task", 512,
                           &data, tskIDLE_PRIORITY, &talky);
     configASSERT(pdPASS == taskErr);
 

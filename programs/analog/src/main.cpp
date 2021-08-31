@@ -6,9 +6,9 @@
 #include <unistd.h>
 #include <variant>
 
+#include <vla/adc.hpp>
 #include <vla/queue.hpp>
 #include <vla/task.hpp>
-#include <vla/adc.hpp>
 
 extern "C" void quick_blink(const int n) {
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -27,7 +27,7 @@ extern "C" void quick_blink(const int n) {
 }
 
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
-using BoxedCharPtr = vla::Box<ManagedCharPtr>;
+using BoxedCharPtr   = vla::Box<ManagedCharPtr>;
 BoxedCharPtr make_boxed_char_ptr(const char *s) {
     return BoxedCharPtr(ManagedCharPtr(strdup(s), &free));
 }
@@ -40,8 +40,10 @@ struct OutputMsg : public vla::WithReply<int32_t> {
     std::variant<BoxedCharPtr, const char *> buffer;
     OutputMsg() = default;
     template <typename B, typename ReplyQueue>
-    OutputMsg(B &&b, ReplyQueue &q) : WithReply(q), buffer(b) {}
-    template <typename B> OutputMsg(B &&b) : buffer(b) {}
+    OutputMsg(B &&b, ReplyQueue &q) : WithReply(q), buffer(b) {
+    }
+    template <typename B> OutputMsg(B &&b) : buffer(b) {
+    }
 };
 using OutputQueue = vla::Queue<OutputMsg>;
 
@@ -80,10 +82,12 @@ void print(OutputQueue::Sender q, Params... params) {
     print2(q, ost, params...);
 }
 
-namespace vla{namespace adc {
-        uint8_t get_read_input(uint8_t next_input);
-        extern volatile uint32_t irq_count[CHANNEL_COUNT];
-}}
+namespace vla {
+namespace adc {
+uint8_t get_read_input(uint8_t next_input);
+extern volatile uint32_t irq_count[CHANNEL_COUNT];
+} // namespace adc
+} // namespace vla
 void run(OutputQueue::Sender q) {
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
@@ -93,14 +97,16 @@ void run(OutputQueue::Sender q) {
         sleep_ms(1000);
     }
     print(q, "Begin\n");
-    auto mask = vla::adc::AdcInput::ADC_0 | vla::adc::AdcInput::ADC_1 | vla::adc::AdcInput::ADC_4;
+    auto mask = vla::adc::AdcInput::ADC_0 | vla::adc::AdcInput::ADC_1 |
+                vla::adc::AdcInput::ADC_4;
     vla::adc::init(mask, 100);
     while (true) {
         for (auto adci : {vla::adc::AdcInput::ADC_0, vla::adc::AdcInput::ADC_1,
                           vla::adc::AdcInput::ADC_2, vla::adc::AdcInput::ADC_3,
                           vla::adc::AdcInput::ADC_4}) {
             print(q, vla::adc::irq_count[uint8_t(adci)], "\n");
-            print(q, "Selected: ", adci, " value: ", vla::adc::read(adci).value_or(-1), "\n");
+            print(q, "Selected: ", adci,
+                  " value: ", vla::adc::read(adci).value_or(-1), "\n");
         }
         print(q, "\n");
         quick_blink(1);

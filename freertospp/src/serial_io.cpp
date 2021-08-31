@@ -1,6 +1,6 @@
-#include <vla/serial_io.hpp>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
+#include <vla/serial_io.hpp>
 
 namespace vla {
 namespace serial_io {

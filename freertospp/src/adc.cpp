@@ -1,21 +1,21 @@
+#include <atomic>
 #include <hardware/adc.h>
 #include <hardware/irq.h>
-#include <vla/adc.hpp>
 #include <iostream>
-#include <atomic>
+#include <vla/adc.hpp>
 
 namespace vla {
 namespace adc {
 
 static std::atomic<AdcMask> active_channels;
 
-constexpr uint8_t ADC_PIN_BASE = 26;
+constexpr uint8_t ADC_PIN_BASE      = 26;
 constexpr uint16_t SAMPLE_ERROR_BIT = 1 << 12;
 
 static uint16_t samples[CHANNEL_COUNT];
 
 static uint8_t get_read_input(uint8_t next_input) {
-    auto ac = active_channels.load();
+    auto ac            = active_channels.load();
     uint8_t read_input = (CHANNEL_COUNT - 1 + next_input) % CHANNEL_COUNT;
     while (!(ac & AdcInput(read_input)) && next_input != read_input) {
         read_input = (CHANNEL_COUNT - 1 + read_input) % CHANNEL_COUNT;
@@ -57,7 +57,7 @@ static float frequency_to_divider(float hz) {
 bool init(AdcMask ac, float frequency) {
     // cleanup any pending configuration
     uninit();
-    active_channels = ac;
+    active_channels           = ac;
     auto active_channel_count = 0;
     for (uint8_t i = 0; i < CHANNEL_COUNT - 1; ++i) {
         const auto pin = ADC_PIN_BASE + i;
@@ -67,7 +67,7 @@ bool init(AdcMask ac, float frequency) {
         }
     }
     adc_set_temp_sensor_enabled(ac & AdcInput::ADC_4);
-    if (ac)  {
+    if (ac) {
         adc_init();
         adc_set_round_robin(ac.mask);
         adc_irq_set_enabled(true);
@@ -75,7 +75,7 @@ bool init(AdcMask ac, float frequency) {
             true,  // Write each completed conversion to the sample FIFO
             false, // Enable DMA data request (DREQ)
             1,     // DREQ (and IRQ) asserted when at least 1 sample present
-            true, // Keep sample error bit on error
+            true,  // Keep sample error bit on error
             false  // Keep full 12 bits of each sample
         );
         auto divider = frequency_to_divider(frequency * active_channel_count);

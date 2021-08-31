@@ -3,28 +3,29 @@
 
 #include <functional>
 #include <variant>
-#include <vla/serial_io.hpp>
 #include <vla/pdu_handler_base.hpp> // :TODO: refactor this to include only rtu_message definition
+#include <vla/serial_io.hpp>
 
 namespace vla {
 
 using RtuMessageHandler =
     std::function<void(const vla::rtu_message &, vla::rtu_message &)>;
 
-struct TimeoutMsg {
-};
+struct TimeoutMsg {};
 struct ReadChar {
     uint64_t when;
     uint8_t chr;
     ReadChar() = default;
-    explicit ReadChar(uint64_t w, uint8_t c):when(w), chr(c){}
+    explicit ReadChar(uint64_t w, uint8_t c) : when(w), chr(c) {
+    }
 };
 
-using ModbusDaemonMessage = std::variant<ReadChar, TimeoutMsg, vla::rtu_message, int32_t>;
+using ModbusDaemonMessage =
+    std::variant<ReadChar, TimeoutMsg, vla::rtu_message, int32_t>;
 using ModbusDaemonQueue = vla::Queue<ModbusDaemonMessage>;
 
 // functions of this type are responsible for feeding chars (ReadChar)
-using GetCharsCb = void (*)(ModbusDaemonQueue::SenderIsr*);
+using GetCharsCb = void (*)(ModbusDaemonQueue::SenderIsr *);
 
 void modbus_daemon(ModbusDaemonQueue &q,
                    vla::serial_io::OutputQueue::Sender outq,

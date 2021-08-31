@@ -5,23 +5,23 @@
 #include <task.h>
 #include <unistd.h>
 
-#include <vla/queue.hpp>
-#include <vla/task.hpp>
-#include <vla/serial_io.hpp>
 #include <variant>
+#include <vla/queue.hpp>
+#include <vla/serial_io.hpp>
+#include <vla/task.hpp>
 
 using vla::serial_io::Buffer;
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
-using BoxedCharPtr = vla::Box<ManagedCharPtr>;
-BoxedCharPtr make_boxed_char_ptr(const char* s) {
+using BoxedCharPtr   = vla::Box<ManagedCharPtr>;
+BoxedCharPtr make_boxed_char_ptr(const char *s) {
     return BoxedCharPtr(ManagedCharPtr(strdup(s), &free));
 }
-using InputMsg = vla::serial_io::InputMsg;
-using OutputMsg = vla::serial_io::OutputMsg;
-using InputQueue = vla::serial_io::InputQueue;
+using InputMsg    = vla::serial_io::InputMsg;
+using OutputMsg   = vla::serial_io::OutputMsg;
+using InputQueue  = vla::serial_io::InputQueue;
 using OutputQueue = vla::serial_io::OutputQueue;
 
-auto inputManager = vla::serial_io::stdin_manager;
+auto inputManager  = vla::serial_io::stdin_manager;
 auto outputManager = vla::serial_io::stdout_manager;
 
 using BlinkQueue = vla::Queue<bool>;
@@ -61,11 +61,8 @@ void echo(InputQueue::Sender iq, OutputQueue::Sender oq) {
 }
 
 Buffer buffer_from_string(const char *str) {
-    return {
-        .data = (uint8_t *)str, .size = strlen(str), .deleter = nullptr
-    };
+    return {.data = (uint8_t *)str, .size = strlen(str), .deleter = nullptr};
 }
-
 
 void run(BlinkQueue::Sender &bq, OutputQueue::Sender &oq) {
     bool isLedOn = false;
@@ -82,8 +79,8 @@ void run(BlinkQueue::Sender &bq, OutputQueue::Sender &oq) {
 
 int main() {
     auto blinkyq = BlinkQueue(1);
-    auto oq = OutputQueue(1);
-    auto iq = InputQueue(1);
+    auto oq      = OutputQueue(1);
+    auto iq      = InputQueue(1);
 
     auto blinky =
         vla::Task(std::bind(blink, blinkyq.receiver()), "Blinky task");
