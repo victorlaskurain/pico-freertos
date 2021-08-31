@@ -3,6 +3,8 @@
 
 /* Here is a good place to include header files that are required across
 your application. */
+#include <stdio.h>
+
 #define configTICK_CORE 0
 
 #define configUSE_PREEMPTION                    1
@@ -24,7 +26,7 @@ your application. */
 #define configUSE_ALTERNATIVE_API               0 /* Deprecated! */
 #define configQUEUE_REGISTRY_SIZE               10
 #define configUSE_QUEUE_SETS                    0
-#define configUSE_TIME_SLICING                  0
+#define configUSE_TIME_SLICING                  1
 #define configUSE_NEWLIB_REENTRANT              0
 #define configENABLE_BACKWARD_COMPATIBILITY     0
 #define configNUM_THREAD_LOCAL_STORAGE_POINTERS 5
@@ -66,7 +68,7 @@ your application. */
 #define configMAX_API_CALL_INTERRUPT_PRIORITY   [dependent on processor and application]
 
 /* Define to trap errors during development. */
-#define configASSERT( x )
+#define configASSERT( x ) if ((x) == 0) printf("configASSERT %s:%d\n", __FILE__, __LINE__)
 
 /* FreeRTOS MPU specific definitions. */
 #define configINCLUDE_APPLICATION_DEFINED_PRIVILEGED_FUNCTIONS 0
@@ -93,6 +95,8 @@ your application. */
 #define INCLUDE_xTaskAbortDelay                 0
 #define INCLUDE_xTaskGetHandle                  0
 #define INCLUDE_xTaskResumeFromISR              1
+
+#define configSUPPORT_PICO_SYNC_INTEROP         0
 
 /* A header file that defines trace macro can be included here. */
 
