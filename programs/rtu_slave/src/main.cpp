@@ -90,7 +90,7 @@ static void write_msg(OutputQueue::Sender q, const char *msg,
     }
 }
 
-class RtuHandler : public vla::pdu_handler_base<RtuHandler> {
+class RtuHandler : public vla::PduHandlerBase<RtuHandler> {
   public:
     bool is_read_registers_supported() {
         return true;
@@ -102,14 +102,13 @@ class RtuHandler : public vla::pdu_handler_base<RtuHandler> {
         *w = address;
         return true;
     }
-    RtuHandler(vla::rtu_address addr)
-        : vla::pdu_handler_base<RtuHandler>(addr) {
+    RtuHandler(vla::RtuAddress addr) : vla::PduHandlerBase<RtuHandler>(addr) {
     }
 };
 
-static auto rtu_handler = RtuHandler(vla::rtu_address(0x01));
-void handle_modbus_message(const vla::rtu_message &indication,
-                           vla::rtu_message &reply) {
+static auto rtu_handler = RtuHandler(vla::RtuAddress(0x01));
+void handle_modbus_message(const vla::RtuMessage &indication,
+                           vla::RtuMessage &reply) {
     rtu_handler.handle_indication(indication, reply);
 }
 

@@ -7,11 +7,11 @@
 namespace vla {
 
 #ifdef MODBUS_RTU_STD_TIMEOUTS
-static const auto inter_frame_delay = period_us{1750};
-static const auto inter_char_delay  = period_us{750};
+static const auto inter_frame_delay = PeriodUs{1750};
+static const auto inter_char_delay  = PeriodUs{750};
 #else
-static const auto inter_frame_delay = period_us{75};
-static const auto inter_char_delay  = period_us{15};
+static const auto inter_frame_delay = PeriodUs{75};
+static const auto inter_char_delay  = PeriodUs{15};
 #endif
 
 enum class state_t : uint8_t {
@@ -41,14 +41,14 @@ using InputMsg  = vla::serial_io::InputMsg;
 using OutputMsg = vla::serial_io::OutputMsg;
 using Buffer    = vla::serial_io::Buffer;
 
-static bool must_transmit(const rtu_message &msg) {
+static bool must_transmit(const RtuMessage &msg) {
     return msg.length > 0;
 }
 
-static alarm_id set_alarm(ModbusDaemonQueue &q, period_us us) {
+static AlarmId set_alarm(ModbusDaemonQueue &q, PeriodUs us) {
     return set_alarm(
         us,
-        [](alarm_id, void *data) -> int64_t {
+        [](AlarmId, void *data) -> int64_t {
             static_cast<ModbusDaemonQueue *>(data)->sendFromIsr(TimeoutMsg{});
             return 0;
         },
@@ -56,11 +56,11 @@ static alarm_id set_alarm(ModbusDaemonQueue &q, period_us us) {
 }
 
 void get_chars_stdin_timer(ModbusDaemonQueue::SenderIsr *q) {
-    static alarm_id id;
+    static AlarmId id;
     if (id) {
         return;
     }
-    auto handler = [](alarm_id, void *d) -> int64_t {
+    auto handler = [](AlarmId, void *d) -> int64_t {
         BaseType_t taskWoken;
         auto q   = static_cast<ModbusDaemonQueue::SenderIsr *>(d);
         auto chr = getchar_timeout_us(0);
@@ -70,7 +70,7 @@ void get_chars_stdin_timer(ModbusDaemonQueue::SenderIsr *q) {
         }
         return -500;
     };
-    vla::set_alarm(period_us(500), handler, q);
+    vla::set_alarm(PeriodUs(500), handler, q);
 }
 
 void modbus_daemon_stdin(vla::serial_io::OutputQueue::Sender outq,
@@ -88,8 +88,8 @@ void modbus_daemon(ModbusDaemonQueue &q,
     uint8_t buffer[PDU_MAX];
     uint8_t buffer_i = 0;
     uint8_t chr;
-    vla::rtu_message rtu_msg;
-    alarm_id aid;
+    vla::RtuMessage rtu_msg;
+    AlarmId aid;
 
     while (true) {
         // uncomment to debug state transitions
@@ -119,7 +119,7 @@ void modbus_daemon(ModbusDaemonQueue &q,
                 aid                = set_alarm(q, inter_frame_delay);
                 buffer[buffer_i++] = chr;
                 state              = state_t::RECEPTION;
-            } else if (auto rtu_msg_ptr = std::get_if<vla::rtu_message>(&msg)) {
+            } else if (auto rtu_msg_ptr = std::get_if<vla::RtuMessage>(&msg)) {
                 if (must_transmit(*rtu_msg_ptr)) {
                     rtu_msg = *rtu_msg_ptr;
                     state   = state_t::EMISSION;
@@ -144,7 +144,7 @@ void modbus_daemon(ModbusDaemonQueue &q,
                 buffer[buffer_i++] = chr;
                 aid                = set_alarm(q, inter_frame_delay);
             } else if (std::get_if<TimeoutMsg>(&msg)) {
-                rtu_msg  = rtu_message(buffer, buffer_i);
+                rtu_msg  = RtuMessage(buffer, buffer_i);
                 buffer_i = 0;
                 state    = state_t::PROCESSING;
             } else {

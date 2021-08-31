@@ -25,19 +25,19 @@ inline uint16_t fix_endianess(uint16_t v) {
 }
 #endif
 
-struct rtu_address {
+struct RtuAddress {
     uint8_t address;
-    explicit rtu_address(uint8_t a) : address(a) {
+    explicit RtuAddress(uint8_t a) : address(a) {
     }
-    bool operator==(rtu_address other) {
+    bool operator==(RtuAddress other) {
         return address == other.address;
     }
-    bool operator!=(rtu_address other) {
+    bool operator!=(RtuAddress other) {
         return address != other.address;
     }
 };
 
-enum class rtu_function_code : uint8_t {
+enum class RtuFunctionCode : uint8_t {
     // physical discrete input
     READ_DISCRETE_INPUT = 0x02,
     // internal bits or physical bits
@@ -65,7 +65,7 @@ enum class rtu_function_code : uint8_t {
     READ_DEVICE_IDENTIFICATION = 0x2b
 };
 
-enum class rtu_exception_code : uint8_t {
+enum class RtuExceptionCode : uint8_t {
     ILLEGAL_FUNCTION                 = 0x01,
     ILLEGAL_DATA_ADDRESS             = 0x02,
     ILLEGAL_DATA_VALUE               = 0x03,
@@ -77,28 +77,28 @@ enum class rtu_exception_code : uint8_t {
     GATEWAY_TARGET_FAILED_TO_RESPOND = 0x0b
 };
 
-struct rtu_message {
+struct RtuMessage {
     uint8_t *buffer;
     uint8_t length;
-    rtu_message() = default;
-    rtu_message(uint8_t *b, uint8_t l) : buffer{b}, length{l} {
+    RtuMessage() = default;
+    RtuMessage(uint8_t *b, uint8_t l) : buffer{b}, length{l} {
     }
-    rtu_address address() const {
-        return rtu_address{buffer[0]};
+    RtuAddress address() const {
+        return RtuAddress{buffer[0]};
     }
-    rtu_function_code function_code() const {
-        return static_cast<rtu_function_code>(buffer[1]);
+    RtuFunctionCode function_code() const {
+        return static_cast<RtuFunctionCode>(buffer[1]);
     }
 };
 
-template <class pdu_handler> class pdu_handler_base {
+template <class PduHandler> class PduHandlerBase {
   public:
-    pdu_handler_base(rtu_address address) : address(address) {
+    PduHandlerBase(RtuAddress address) : address(address) {
     }
     // the message buffer must be large enough to hold any modbus
     // message, that means at least 256 bytes. Reply and
     // indication can be the same data structure.
-    void handle_indication(const rtu_message &indication, rtu_message &reply) {
+    void handle_indication(const RtuMessage &indication, RtuMessage &reply) {
         if (self().is_address_valid(indication.address())) {
             self().execute_function(indication, reply);
             self().append_crc(reply);
@@ -106,8 +106,8 @@ template <class pdu_handler> class pdu_handler_base {
             reply.length = 0;
         }
     }
-    pdu_handler &self() {
-        return *static_cast<pdu_handler *>(this);
+    PduHandler &self() {
+        return *static_cast<PduHandler *>(this);
     }
 
   protected:
@@ -207,15 +207,15 @@ template <class pdu_handler> class pdu_handler_base {
     static constexpr int READ_WRITE_COILS_MAX_COILS    = 0x07b0;
     static constexpr int WRITE_REGISTERS_MAX_REGISTERS = 0x07b;
     static constexpr int READ_REGISTERS_MAX_REGISTERS  = 0x007d;
-    rtu_address address;
-    void append_crc(rtu_message &reply) {
+    RtuAddress address;
+    void append_crc(RtuMessage &reply) {
         auto crc = vla_modbus_crc16(reply.buffer, reply.length);
         reply.buffer[reply.length]     = crc;
         reply.buffer[reply.length + 1] = crc >> 8;
         reply.length += 2;
     }
-    bool is_address_valid(rtu_address addr) {
-        if (addr != address && addr != rtu_address{0}) {
+    bool is_address_valid(RtuAddress addr) {
+        if (addr != address && addr != RtuAddress{0}) {
             return false;
         }
         return true;
@@ -241,52 +241,52 @@ template <class pdu_handler> class pdu_handler_base {
     bool is_write_single_coil_valid_data_value(uint16_t v) {
         return 0x0000 == v || 0xff00 == v;
     }
-    void execute_function(const rtu_message &indication, rtu_message &reply) {
+    void execute_function(const RtuMessage &indication, RtuMessage &reply) {
         switch (indication.function_code()) {
-        case rtu_function_code::READ_COILS:
+        case RtuFunctionCode::READ_COILS:
             execute_read_coils(indication, reply);
             break;
-        case rtu_function_code::WRITE_SINGLE_COIL:
+        case RtuFunctionCode::WRITE_SINGLE_COIL:
             execute_write_single_coil(indication, reply);
             break;
-        case rtu_function_code::WRITE_COILS:
+        case RtuFunctionCode::WRITE_COILS:
             execute_write_coils(indication, reply);
             break;
-        case rtu_function_code::READ_HOLDING_REGISTERS:
+        case RtuFunctionCode::READ_HOLDING_REGISTERS:
             execute_read_registers(indication, reply);
             break;
-        case rtu_function_code::WRITE_MULTIPLE_REGISTERS:
+        case RtuFunctionCode::WRITE_MULTIPLE_REGISTERS:
             execute_write_registers(indication, reply);
             break;
-        case rtu_function_code::WRITE_SINGLE_REGISTER:
+        case RtuFunctionCode::WRITE_SINGLE_REGISTER:
             execute_write_single_register(indication, reply);
             break;
         default:
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
     }
-    void execute_read_coils(const rtu_message &indication, rtu_message &reply) {
+    void execute_read_coils(const RtuMessage &indication, RtuMessage &reply) {
         uint16_t address   = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  bit_count = fix_endianess(*(uint16_t *)&indication.buffer[4]);
         if (!self().is_read_coils_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_read_coils_valid_data_address(address, bit_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().is_read_coils_valid_data_value(bit_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_VALUE,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_VALUE,
                                  indication, reply);
             return;
         }
         if (!self().execute_read_coils(address, bit_count, &reply.buffer[3])) {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
             return;
         }
@@ -296,24 +296,24 @@ template <class pdu_handler> class pdu_handler_base {
         reply.buffer[1] = indication.buffer[1];
         reply.length    = reply.buffer[2] + 3;
     }
-    void execute_read_registers(const rtu_message &indication,
-                                rtu_message &reply) {
+    void execute_read_registers(const RtuMessage &indication,
+                                RtuMessage &reply) {
         uint16_t address = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  register_count =
                      fix_endianess(*(uint16_t *)&indication.buffer[4]);
         if (!self().is_read_registers_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_read_registers_valid_data_address(address,
                                                          register_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().is_read_registers_valid_data_value(register_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_VALUE,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_VALUE,
                                  indication, reply);
             return;
         }
@@ -329,59 +329,58 @@ template <class pdu_handler> class pdu_handler_base {
             reply.buffer[2] = register_count * 2;
             reply.length    = register_count * 2 + 3;
         } else {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
         }
     }
-    void execute_write_coils(const rtu_message &indication,
-                             rtu_message &reply) {
+    void execute_write_coils(const RtuMessage &indication, RtuMessage &reply) {
         uint16_t address    = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  bit_count  = fix_endianess(*(uint16_t *)&indication.buffer[4]),
                  byte_count = indication.buffer[6];
         uint8_t *bits       = &indication.buffer[7];
         if (!self().is_write_coils_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_write_coils_valid_data_address(address, bit_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().is_write_coils_valid_data_value(bit_count, byte_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_VALUE,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_VALUE,
                                  indication, reply);
             return;
         }
         if (!self().execute_write_coils(address, bits, bit_count)) {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
             return;
         }
         make_echo_reply(indication, reply, WRITE_COILS_REPLY_LENGTH);
     }
-    void execute_write_registers(const rtu_message &indication,
-                                 rtu_message &reply) {
+    void execute_write_registers(const RtuMessage &indication,
+                                 RtuMessage &reply) {
         uint16_t address = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  register_count =
                      fix_endianess(*(uint16_t *)&indication.buffer[4]);
         uint8_t byte_count = indication.buffer[6];
         uint16_t *words    = (uint16_t *)&indication.buffer[7];
         if (!self().is_write_registers_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_write_registers_valid_data_address(address,
                                                           register_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().is_write_registers_valid_data_value(register_count,
                                                         byte_count)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_VALUE,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_VALUE,
                                  indication, reply);
             return;
         }
@@ -389,33 +388,33 @@ template <class pdu_handler> class pdu_handler_base {
             words[i] = fix_endianess(words[i]);
         }
         if (!self().execute_write_registers(address, words, register_count)) {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
             return;
         }
         make_echo_reply(indication, reply, WRITE_REGISTERS_REPLY_LENGTH);
     }
-    void execute_write_single_coil(const rtu_message &indication,
-                                   rtu_message &reply) {
+    void execute_write_single_coil(const RtuMessage &indication,
+                                   RtuMessage &reply) {
         uint16_t address = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  value   = fix_endianess(*(uint16_t *)&indication.buffer[4]);
         if (!self().is_write_single_coil_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_write_single_coil_valid_data_address(address)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().is_write_single_coil_valid_data_value(value)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_VALUE,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_VALUE,
                                  indication, reply);
             return;
         }
         if (!self().execute_write_single_coil(address, bool(value))) {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
             return;
         }
@@ -423,41 +422,40 @@ template <class pdu_handler> class pdu_handler_base {
             indication, reply); // discard CRC in echo, it will be recalculated
         return;
     }
-    void execute_write_single_register(const rtu_message &indication,
-                                       rtu_message &reply) {
+    void execute_write_single_register(const RtuMessage &indication,
+                                       RtuMessage &reply) {
         uint16_t address = fix_endianess(*(uint16_t *)&indication.buffer[2]),
                  register_value =
                      fix_endianess(*(uint16_t *)&indication.buffer[4]);
         if (!self().is_write_single_register_supported()) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_FUNCTION,
-                                 indication, reply);
+            make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
+                                 reply);
             return;
         }
         if (!self().is_write_registers_valid_data_address(address, 1)) {
-            make_exception_reply(rtu_exception_code::ILLEGAL_DATA_ADDRESS,
+            make_exception_reply(RtuExceptionCode::ILLEGAL_DATA_ADDRESS,
                                  indication, reply);
             return;
         }
         if (!self().execute_write_registers(address, &register_value, 1)) {
-            make_exception_reply(rtu_exception_code::SERVER_DEVICE_FAILURE,
+            make_exception_reply(RtuExceptionCode::SERVER_DEVICE_FAILURE,
                                  indication, reply);
             return;
         }
         make_echo_reply_no_crc(indication, reply);
     }
-    void make_echo_reply_no_crc(const rtu_message &indication,
-                                rtu_message &reply) {
+    void make_echo_reply_no_crc(const RtuMessage &indication,
+                                RtuMessage &reply) {
         memmove(reply.buffer, indication.buffer, indication.length - 2);
         reply.length = indication.length - 2;
     }
-    void make_echo_reply(const rtu_message &indication, rtu_message &reply,
+    void make_echo_reply(const RtuMessage &indication, RtuMessage &reply,
                          uint8_t length) {
         memmove(reply.buffer, indication.buffer, length);
         reply.length = length;
     }
-    void make_exception_reply(rtu_exception_code ex,
-                              const rtu_message &indication,
-                              rtu_message &reply) {
+    void make_exception_reply(RtuExceptionCode ex, const RtuMessage &indication,
+                              RtuMessage &reply) {
         reply.buffer[0] = indication.buffer[0];
         reply.buffer[1] = indication.buffer[1] | 0x80;
         reply.buffer[2] = uint8_t(ex);

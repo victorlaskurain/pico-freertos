@@ -5,69 +5,69 @@
 
 namespace vla {
 
-struct period_us {
+struct PeriodUs {
     uint32_t us;
-    constexpr explicit period_us(uint32_t us) : us(us) {
+    constexpr explicit PeriodUs(uint32_t us) : us(us) {
     }
-    period_us operator-(period_us other) const {
-        return period_us{us - other.us};
+    PeriodUs operator-(PeriodUs other) const {
+        return PeriodUs{us - other.us};
     }
 };
 
-struct timestamp_us {
+struct TimestampUs {
     uint32_t us = 0;
-    explicit timestamp_us(uint32_t us) : us(us) {
+    explicit TimestampUs(uint32_t us) : us(us) {
     }
-    timestamp_us(const timestamp_us &other) : us(other.us) {
+    TimestampUs(const TimestampUs &other) : us(other.us) {
     }
-    timestamp_us(const volatile timestamp_us &other) : us(other.us) {
+    TimestampUs(const volatile TimestampUs &other) : us(other.us) {
     }
-    timestamp_us &operator+=(period_us delta) {
+    TimestampUs &operator+=(PeriodUs delta) {
         us += delta.us;
         return *this;
     }
-    volatile timestamp_us &operator+=(period_us delta) volatile {
+    volatile TimestampUs &operator+=(PeriodUs delta) volatile {
         us += delta.us;
         return *this;
     }
-    timestamp_us operator+(period_us delta) volatile {
+    TimestampUs operator+(PeriodUs delta) volatile {
         auto newus = *this;
         return newus += delta;
     }
-    timestamp_us operator+(period_us delta) {
+    TimestampUs operator+(PeriodUs delta) {
         auto newus = *this;
         return newus += delta;
     }
-    bool operator<(timestamp_us other) const {
+    bool operator<(TimestampUs other) const {
         return us < other.us;
     }
 };
-inline period_us operator-(timestamp_us a, timestamp_us b) {
+inline PeriodUs operator-(TimestampUs a, TimestampUs b) {
     if (a < b) {
-        return period_us(0);
+        return PeriodUs(0);
     }
-    return period_us(a.us - b.us);
+    return PeriodUs(a.us - b.us);
 }
 
-struct alarm_id {
+struct AlarmId {
     int32_t id = 0;
-    explicit alarm_id(int32_t id = 0) : id(id) {
+    explicit AlarmId(int32_t id = 0) : id(id) {
     }
     explicit operator bool() const {
         return id > 0;
     }
-    bool operator==(alarm_id other) const {
+    bool operator==(AlarmId other) const {
         return id == other.id;
     }
-    bool operator!=(alarm_id other) const {
+    bool operator!=(AlarmId other) const {
         return !(*this == other);
     }
 };
 
-using alarm_cb_t = int64_t (*)(alarm_id, void *);
+using AlarmCb = int64_t (*)(AlarmId, void *);
 
-alarm_id set_alarm(period_us us, alarm_cb_t, void *data);
-void cancel_alarm(alarm_id id);
+AlarmId set_alarm(PeriodUs us, AlarmCb, void *data);
+void cancel_alarm(AlarmId id);
 
 } // namespace vla
 
