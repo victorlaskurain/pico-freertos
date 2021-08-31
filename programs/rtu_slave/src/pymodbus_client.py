@@ -23,8 +23,14 @@ def main():
     conn = client.connect()
 
     print('client.read_holding_registers(0x0000, 1, unit=0x01)')
-    registers = client.read_holding_registers(0x0000, 6, unit=0x01)
-    print(registers)
+    registers = client.read_holding_registers(0x0000, 8, unit=0x01)
+    print(registers.registers)
+
+    print('client.write_register(0x0005, 0xff, unit=0x01)')
+    registers = client.write_register(0x0005, 0xff, unit=0x01)
+
+    print('client.read_holding_registers(0x0000, 1, unit=0x01)')
+    registers = client.read_holding_registers(0x0000, 8, unit=0x01)
     print(registers.registers)
 
 if __name__ == '__main__':

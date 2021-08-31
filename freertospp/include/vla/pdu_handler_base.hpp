@@ -299,7 +299,8 @@ template <class PduHandler> class PduHandlerBase {
                  register_count =
                      fix_endianess(*(uint16_t *)&indication.buffer[4]);
         uint8_t byte_count = indication.buffer[6];
-        uint16_t *words    = (uint16_t *)&indication.buffer[7];
+        uint16_t words[PDU_MAX];
+        std::memcpy(words, &indication.buffer[7], byte_count);
         if (!self().is_write_registers_supported()) {
             make_exception_reply(RtuExceptionCode::ILLEGAL_FUNCTION, indication,
                                  reply);

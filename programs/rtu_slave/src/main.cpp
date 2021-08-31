@@ -54,6 +54,7 @@ static void switch_led(SwitchLedConfig c) {
 }
 
 class RtuHandler : public vla::PduHandlerBase<RtuHandler> {
+    uint16_t stored_value;
   public:
     bool is_read_registers_supported() {
         return true;
@@ -61,14 +62,22 @@ class RtuHandler : public vla::PduHandlerBase<RtuHandler> {
     bool is_write_registers_supported() {
         return true;
     }
-    bool execute_read_single_register(uint16_t address, uint16_t *w) {
+    bool execute_read_single_register(const uint16_t address, uint16_t *w) {
         if (address <= uint16_t(vla::adc::AdcInput::ADC_4)) {
             auto adci = vla::adc::AdcInput(address);
             *w        = vla::adc::read(adci).value_or(-1);
+        } else if (address == uint16_t(vla::adc::AdcInput::ADC_4) + 1) {
+            *w = stored_value;
         } else {
             *w = uint16_t(-1);
         }
 
+        return true;
+    }
+    bool execute_write_single_register(const uint16_t address, uint16_t v) {
+        if (address == uint16_t(vla::adc::AdcInput::ADC_4) + 1) {
+            stored_value = v;
+        }
         return true;
     }
     RtuHandler(vla::RtuAddress addr) : vla::PduHandlerBase<RtuHandler>(addr) {
