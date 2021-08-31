@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <variant>
-#include <vla/pdu_handler_base.hpp> // :TODO: refactor this to include only RtuMessage definition
+#include <vla/rtu_message.hpp>
 #include <vla/serial_io.hpp>
 
 namespace vla {
