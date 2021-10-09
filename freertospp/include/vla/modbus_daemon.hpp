@@ -21,7 +21,7 @@ struct ReadChar {
 };
 
 using ModbusDaemonMessage =
-    std::variant<ReadChar, TimeoutMsg, vla::RtuMessage, int32_t>;
+    std::variant<ReadChar, TimeoutMsg, vla::RtuMessage, vla::serial_io::BytesWritten>;
 using ModbusDaemonQueue = vla::Queue<ModbusDaemonMessage>;
 
 // functions of this type are responsible for feeding chars (ReadChar)

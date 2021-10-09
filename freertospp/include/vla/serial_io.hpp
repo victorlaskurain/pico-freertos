@@ -25,6 +25,12 @@ struct Buffer {
     }
 };
 
+struct BytesWritten {
+    int32_t count;
+    BytesWritten(int32_t c):count(c){}
+    BytesWritten() = default;
+};
+
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
 using BoxedCharPtr   = vla::Box<ManagedCharPtr>;
 BoxedCharPtr make_boxed_char_ptr(const char *s);
@@ -33,7 +39,7 @@ BoxedCharPtr make_boxed_char_ptr(const char *s);
  * charptr in the form of a Boxed unique_ptr or a simple non owning
  * char pointer.
  */
-struct OutputMsg : public vla::WithReply<int32_t> {
+struct OutputMsg : public vla::WithReply<BytesWritten> {
     std::variant<BoxedCharPtr, Buffer, const char *> buffer;
     OutputMsg() = default;
     template <typename B, typename ReplyQueue>
@@ -51,7 +57,7 @@ void print2(OutputQueue::Sender q, std::ostringstream &ost, Param1 p,
     print2(q, ost, rest...);
 }
 inline void print2(OutputQueue::Sender q, std::ostringstream &ost) {
-    vla::Queue<int32_t> outAck(1);
+    vla::Queue<BytesWritten> outAck(1);
     q.send({ost.str().c_str(), outAck});
     outAck.receiver().receive();
 }

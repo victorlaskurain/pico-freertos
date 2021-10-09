@@ -11,6 +11,7 @@
 #include <vla/task.hpp>
 
 using vla::serial_io::Buffer;
+using vla::serial_io::BytesWritten;
 using ManagedCharPtr = std::unique_ptr<char, decltype(&free)>;
 using BoxedCharPtr   = vla::Box<ManagedCharPtr>;
 BoxedCharPtr make_boxed_char_ptr(const char *s) {
@@ -43,7 +44,7 @@ void blink(BlinkQueue::Receiver q) {
 
 void echo(InputQueue::Sender iq, OutputQueue::Sender oq) {
     vla::Queue<Buffer> reader(1);
-    vla::Queue<int32_t> outAck(1);
+    vla::Queue<BytesWritten> outAck(1);
     uint8_t data[16];
     while (true) {
         // 1. Send the read request. We can ignore the reply since it will be
