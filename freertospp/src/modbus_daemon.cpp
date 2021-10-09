@@ -12,6 +12,8 @@ static const auto inter_frame_delay = PeriodUs{75};
 static const auto inter_char_delay  = PeriodUs{15};
 #endif
 
+using vla::serial_io::BytesWritten;
+
 enum class state_t : uint8_t {
     INITIAL,
     READY,
@@ -142,7 +144,10 @@ void modbus_daemon(ModbusDaemonQueue &q,
         if (state_t::EMISSION == state) {
             outq.send(
                 OutputMsg(Buffer::create(rtu_msg.buffer, rtu_msg.length), q));
-            q.receive();
+            for (auto msg = q.receive(); !std::get_if<BytesWritten>(&msg);
+                 msg      = q.receive()) {
+                // do nothing, just wait for the message
+            }
             state = state_t::INITIAL;
             continue;
         }
