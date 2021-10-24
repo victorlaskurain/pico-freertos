@@ -1,3 +1,4 @@
+#include <mp/fsm.h>
 #include <pico/stdlib.h>
 #include <vla/hw_timer.hpp>
 #include <vla/modbus_daemon.hpp>
@@ -40,8 +41,9 @@ const char *state_name(state_t s) {
 static AlarmId set_alarm(ModbusDaemonQueue &q, PeriodUs us) {
     return set_alarm(
         us,
-        [](AlarmId, void *data) -> int64_t {
-            static_cast<ModbusDaemonQueue *>(data)->sendFromIsr(TimeoutMsg{});
+        [](AlarmId aid, void *data) -> int64_t {
+            static_cast<ModbusDaemonQueue *>(data)->sendFromIsr(
+                TimeoutMsg{aid});
             return 0;
         },
         &q);
@@ -55,102 +57,153 @@ static bool must_transmit(const RtuMessage &msg) {
     return msg.length > 0;
 }
 
+// events:
+// ReadChar, TimeoutMsg, vla::RtuMessage, vla::serial_io::BytesWritten
+struct MdeStart {};
+struct MdsStart {};
+struct MdsInitial {
+    AlarmId aid;
+    MdsInitial(AlarmId aid) : aid(aid) {
+    }
+};
+struct MdsReady {};
+struct MdsEmission {};
+struct MdsReception {
+    AlarmId aid;
+    uint8_t *buffer;
+    uint8_t buffer_i = 0;
+    MdsReception(AlarmId aid, uint8_t *buffer) : aid(aid), buffer(buffer) {
+    }
+    void append_char(uint8_t chr) {
+        buffer[buffer_i++] = chr;
+    }
+};
+struct MdsProcessing {
+    RtuMessage rtu_msg;
+    AlarmId aid;
+    MdsProcessing(RtuMessage m, AlarmId a) : rtu_msg(m), aid(a) {
+    }
+};
+
+using ModbusDaemonState =
+    std::variant<MdsStart, MdsInitial, MdsReady, MdsReception, MdsProcessing,
+                 MdsEmission>;
+class ModbusDaemonFsm : public mp::fsm<ModbusDaemonFsm, ModbusDaemonState> {
+    ModbusDaemonQueue &q;
+    vla::serial_io::OutputQueue::Sender outq;
+    RtuMessageHandler handle_indication;
+    uint8_t buffer[PDU_MAX];
+    uint8_t buffer_i = 0;
+
+  public:
+    ModbusDaemonFsm(ModbusDaemonQueue &q,
+                    vla::serial_io::OutputQueue::Sender outq,
+                    RtuMessageHandler h)
+        : q(q), outq(outq), handle_indication(h) {
+        this->dispatch(MdeStart());
+    }
+
+    template <typename State, typename Event>
+    auto on_event(State &, const Event &) {
+        // unexpected event
+        return MdsInitial(set_alarm(q, inter_frame_delay));
+    }
+
+    /*
+     * STATE MdsStart
+     */
+    auto on_event(MdsStart &, const MdeStart &evt) {
+        return MdsInitial(set_alarm(q, inter_frame_delay));
+    }
+
+    /*
+     * STATE MdsInitial
+     */
+    auto on_event(MdsInitial &state, const ReadChar &msg) {
+        // ignore chars in this state and reset timer
+        cancel_alarm(state.aid);
+        state.aid = set_alarm(q, inter_frame_delay);
+        return std::nullopt;
+    }
+    std::optional<ModbusDaemonState> on_event(MdsInitial &state,
+                                              const TimeoutMsg tout) {
+        if (state.aid != tout.aid) {
+            return std::nullopt;
+        }
+        return MdsReady();
+    }
+
+    /*
+     * STATE MdsReady
+     */
+    auto on_event(MdsReady &, const ReadChar input_msg) {
+        auto new_state = MdsReception(set_alarm(q, inter_frame_delay), buffer);
+        new_state.append_char(input_msg.chr);
+        return new_state;
+    }
+    std::optional<ModbusDaemonState> on_event(MdsReady &,
+                                              const vla::RtuMessage msg) {
+        if (must_transmit(msg)) {
+            outq.send(OutputMsg(Buffer::create(msg.buffer, msg.length), q));
+            return MdsEmission();
+        }
+        return std::nullopt;
+    }
+
+    /*
+     * STATE MdsReception
+     */
+    auto on_event(MdsReception &state, const ReadChar input_msg) {
+        state.append_char(input_msg.chr);
+        cancel_alarm(state.aid);
+        state.aid = set_alarm(q, inter_frame_delay);
+        return std::nullopt;
+    }
+    std::optional<ModbusDaemonState> on_event(MdsReception &state,
+                                              const TimeoutMsg tout) {
+        // we set the timeout for the inter frame delay and process
+        // the message. After processing we wait for the timeout on
+        // the processing state. Anything else but the timeout is an
+        // error.
+        if (tout.aid != state.aid) {
+            return std::nullopt;
+        }
+        auto aid = set_alarm(q, inter_frame_delay - inter_char_delay);
+        auto msg = RtuMessage(state.buffer, state.buffer_i);
+        handle_indication(msg, msg);
+        return MdsProcessing(msg, aid);
+    }
+
+    /*
+     * STATE MdsProcessing
+     */
+    std::optional<ModbusDaemonState> on_event(MdsProcessing &state,
+                                              const TimeoutMsg tout) {
+        if (state.aid != tout.aid) {
+            return std::nullopt;
+        }
+        q.send(state.rtu_msg);
+        return MdsReady();
+    }
+
+    /*
+     * STATE MdsEmission
+     */
+    auto on_event(MdsEmission &state, BytesWritten) {
+        return MdsInitial(set_alarm(q, inter_frame_delay));
+    }
+    template <typename Event> auto on_event(MdsEmission &state, const Event &) {
+        return std::nullopt;
+    }
+};
+
 void modbus_daemon(ModbusDaemonQueue &q,
                    vla::serial_io::OutputQueue::Sender outq,
                    RtuMessageHandler handle_indication) {
-    state_t state = state_t::INITIAL;
-    uint8_t buffer[PDU_MAX];
-    uint8_t buffer_i = 0;
-    uint8_t chr;
-    vla::RtuMessage rtu_msg;
-    AlarmId aid;
-
+    ModbusDaemonFsm fsm(q, outq, handle_indication);
     while (true) {
-        // uncomment to debug state transitions
-        // static auto last_state = state_t::UNKNOWN;
-        // if (last_state != state) {
-        //     printf("\n\n%s\n", state_name(state));
-        //     printf("==========\n");
-        //     write(1, buffer, buffer_i);
-        //     printf("==========\n");
-        //     last_state = state;
-        // }
-        if (state_t::INITIAL == state) {
-            aid      = set_alarm(q, inter_frame_delay);
-            auto msg = q.receive();
-            // ignore chars in this state
-            if (std::get_if<ReadChar>(&msg)) {
-                cancel_alarm(aid);
-            } else if (std::get_if<TimeoutMsg>(&msg)) {
-                state = state_t::READY;
-            }
-            continue;
-        }
-        if (state_t::READY == state) {
-            auto msg = q.receive();
-            if (auto input_msg = std::get_if<ReadChar>(&msg)) {
-                chr                = input_msg->chr;
-                aid                = set_alarm(q, inter_frame_delay);
-                buffer[buffer_i++] = chr;
-                state              = state_t::RECEPTION;
-            } else if (auto rtu_msg_ptr = std::get_if<vla::RtuMessage>(&msg)) {
-                if (must_transmit(*rtu_msg_ptr)) {
-                    rtu_msg = *rtu_msg_ptr;
-                    state   = state_t::EMISSION;
-                }
-            } else {
-                state = state_t::INITIAL;
-            }
-            continue;
-        }
-        if (state_t::RECEPTION == state) {
-            auto msg = q.receive();
-            if (auto input_msg = std::get_if<ReadChar>(&msg)) {
-                chr = input_msg->chr;
-                cancel_alarm(aid);
-                // discard the timeout message that might have
-                // been enqueued during pop and cancellation
-                ModbusDaemonMessage discard;
-                while (q.peek(discard, 0) &&
-                       std::get_if<TimeoutMsg>(&discard)) {
-                    q.receive();
-                }
-                buffer[buffer_i++] = chr;
-                aid                = set_alarm(q, inter_frame_delay);
-            } else if (std::get_if<TimeoutMsg>(&msg)) {
-                rtu_msg  = RtuMessage(buffer, buffer_i);
-                buffer_i = 0;
-                state    = state_t::PROCESSING;
-            } else {
-                state = state_t::INITIAL;
-            }
-            continue;
-        }
-        if (state_t::PROCESSING == state) {
-            // we set the timeout for the inter frame delay and
-            // process the message. After processing we wait for the
-            // timeout. Anything else but the timeout is an error.
-            set_alarm(q, inter_frame_delay - inter_char_delay);
-            handle_indication(rtu_msg, rtu_msg);
-            auto msg = q.receive();
-            if (std::get_if<TimeoutMsg>(&msg)) {
-                q.send(rtu_msg);
-                state = state_t::READY;
-            } else {
-                state = state_t::INITIAL;
-            }
-            continue;
-        }
-        if (state_t::EMISSION == state) {
-            outq.send(
-                OutputMsg(Buffer::create(rtu_msg.buffer, rtu_msg.length), q));
-            for (auto msg = q.receive(); !std::get_if<BytesWritten>(&msg);
-                 msg      = q.receive()) {
-                // do nothing, just wait for the message
-            }
-            state = state_t::INITIAL;
-            continue;
-        }
+        auto msg = q.receive();
+        std::visit([&fsm](auto &event) { fsm.dispatch(event); }, msg);
     }
 }
 

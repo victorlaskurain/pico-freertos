@@ -5,13 +5,17 @@
 #include <variant>
 #include <vla/rtu_message.hpp>
 #include <vla/serial_io.hpp>
+#include <vla/hw_timer.hpp>
 
 namespace vla {
 
 using RtuMessageHandler =
     std::function<void(const vla::RtuMessage &, vla::RtuMessage &)>;
 
-struct TimeoutMsg {};
+struct TimeoutMsg {
+    AlarmId aid;
+    TimeoutMsg(AlarmId aid):aid(aid){}
+};
 struct ReadChar {
     uint64_t when;
     uint8_t chr;
