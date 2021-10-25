@@ -14,29 +14,9 @@ static const auto inter_char_delay  = PeriodUs{15};
 #endif
 
 using vla::serial_io::BytesWritten;
-
-enum class state_t : uint8_t {
-    INITIAL,
-    READY,
-    EMISSION,
-    RECEPTION,
-    PROCESSING,
-    UNKNOWN
-};
-
-const char *state_name(state_t s) {
-    if (state_t::INITIAL == s)
-        return "INITIAL";
-    if (state_t::READY == s)
-        return "READY";
-    if (state_t::EMISSION == s)
-        return "EMISSION";
-    if (state_t::RECEPTION == s)
-        return "RECEPTION";
-    if (state_t::PROCESSING == s)
-        return "PROCESSING";
-    return "XXX";
-};
+using vla::serial_io::InputMsg;
+using vla::serial_io::OutputMsg;
+using vla::serial_io::Buffer;
 
 static AlarmId set_alarm(ModbusDaemonQueue &q, PeriodUs us) {
     return set_alarm(
@@ -48,10 +28,6 @@ static AlarmId set_alarm(ModbusDaemonQueue &q, PeriodUs us) {
         },
         &q);
 }
-
-using InputMsg  = vla::serial_io::InputMsg;
-using OutputMsg = vla::serial_io::OutputMsg;
-using Buffer    = vla::serial_io::Buffer;
 
 static bool must_transmit(const RtuMessage &msg) {
     return msg.length > 0;
